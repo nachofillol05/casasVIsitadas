@@ -28,6 +28,9 @@ app.get('/casas', async (req, res) => {
     } else if (mision) {
       const result = await pool.query('SELECT * FROM casas where mision=$1', [mision]);
       return res.json(result.rows);
+    }else {
+      const result = await pool.query('SELECT * FROM casas');
+      return res.json(result.rows);
     }
   } catch (e) {
     console.error(e);
