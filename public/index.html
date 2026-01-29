@@ -1,360 +1,309 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Usuario - Casas asignadas</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <meta charset="UTF-8">
+  <title>Casas Visitadas | Gestión de Misiones</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
     }
-    #map {
-      height: 75vh;
-      width: 100%;
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f172a, #020617);
+      display: flex;
+      align-items: center;
     }
-    .top-bar {
-      padding: 10px;
+
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: 700;
     }
-    .estado-btn {
-      width: 100%;
-      padding: 15px;
-      font-size: 1.2rem;
-      margin-bottom: 10px;
+
+    .hero span {
+      color: #38bdf8;
+    }
+
+    /* Sections */
+    section {
+      padding: 80px 0;
+    }
+
+    .card-custom {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 15px;
+      transition: 0.3s;
+    }
+
+    .card-custom:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(56,189,248,0.15);
+    }
+
+    /* Mission cards */
+    .mission-btn {
+      background: linear-gradient(135deg, #38bdf8, #0284c7);
       color: white;
       border: none;
-      border-radius: 5px;
+      border-radius: 12px;
+      padding: 10px 15px;
+      width: 100%;
+      font-weight: 600;
+      transition: 0.3s;
     }
-    .btn-visitada { background-color: green; }
-    .btn-no-atendieron { background-color: orange; }
-    .btn-otro { background-color: gray; }
+
+    .mission-btn:hover {
+      opacity: 0.85;
+      transform: scale(1.02);
+    }
+
+    /* Footer */
+    footer {
+      background: #020617;
+      border-top: 1px solid #1e293b;
+      padding: 30px 0;
+    }
+
+    /* WhatsApp */
+    .whatsapp-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #25D366;
+      color: white;
+      padding: 15px 18px;
+      border-radius: 50px;
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      z-index: 999;
+    }
+
+    .whatsapp-btn:hover {
+      background: #1ebe5d;
+      color: white;
+    }
   </style>
 </head>
 <body>
-  <div class="container-fluid">
-    <div class="panel container d-flex justify-content-center flex-wrap gap-2">
-      <input type="text" id="usuario" class="form-control" placeholder="Ingresá tu usuario" />
-      <button id="btnCargar" class="btn btn-primary">Cargar casas</button>
-      <button id="btnToggleVisitadas" class="btn btn-outline-secondary">Ocultar visitadas</button>
-      <button id="btnToggleSatelite" class="btn btn-outline-secondary">Mapa Satelital</button>
-      <button class="btn btn-sm btn-outline-info m-2" data-bs-toggle="modal" data-bs-target="#modalAyuda">¿No encontrás una casa?</button>
-    </div>
-    <div id="map"></div>
-  </div>
 
-  <!-- Modal Estado -->
-  <div class="modal fade" id="estadoModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Actualizar estado y comentario</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-6 mb-4">
+        <h1>Gestioná tus <span>Misiones</span><br>de Casas Visitadas</h1>
+        <p class="mt-3 fst-italic text-info">
+          “Por tanto, id, y haced discípulos a todas las naciones, bautizándolos en el nombre del Padre, y del Hijo, y del Espíritu Santo;” (Mt 28,19)
+        </p>
+
+        <p class="mt-4 text-secondary">
+          Plataforma digital para asignar, monitorear y analizar visitas puerta a puerta
+          en tiempo real, desde cualquier dispositivo.
+        </p>
+
+        <div class="mt-4">
+          <a href="#misiones" class="btn btn-primary btn-lg me-3">Ver Misiones</a>
+          <a href="#contacto" class="btn btn-outline-light btn-lg">Contacto</a>
         </div>
-        <div class="modal-body">
-          <div id="botonesEstado" class="mb-3">
-            <button class="estado-btn btn-visitada" data-estado="visitada">Visitada</button>
-            <button class="estado-btn btn-no-atendieron" data-estado="no_atendieron">No atendieron</button>
-            <button class="estado-btn btn-otro" data-estado="otro">Otro</button>
-          </div>
-          <textarea id="comentario" class="form-control" placeholder="Comentario..."></textarea>
-        </div>
+      </div>
+
+      <div class="col-lg-6 text-center">
+        <img src="https://cdn-icons-png.flaticon.com/512/854/854878.png" width="320" class="img-fluid" alt="Mapa">
       </div>
     </div>
   </div>
+</section>
 
-  <!-- Modal Ayuda -->
-  <div class="modal fade" id="modalAyuda" tabindex="-1" aria-labelledby="modalAyudaLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="modalAyudaLabel">¿No encontrás una casa?</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-        </div>
-        <div class="modal-body">
-          Si llegaste a una casa que no está marcada en el mapa:
-          <ul>
-            <li>Tomale una captura de pantalla al mapa y señalala</li>
-            <li>O buscala en Google Maps y copiá las coordenadas</li>
-            <li>Después informanos para agregarla manualmente</li>
-          </ul>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+<!-- BENEFICIOS -->
+<section id="beneficios">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="fw-bold">¿Por qué usar Casas Visitadas?</h2>
+      <p class="text-secondary">Todo lo que necesitás en un solo lugar</p>
+    </div>
+
+    <div class="row g-4">
+
+      <div class="col-md-4">
+        <div class="card-custom p-4 h-100">
+          <h5>📍 Mapa en Tiempo Real</h5>
+          <p class="text-secondary mt-3">
+            Visualizá todas las casas, estados y usuarios en un mapa interactivo.
+          </p>
         </div>
       </div>
+
+      <div class="col-md-4">
+        <div class="card-custom p-4 h-100">
+          <h5>👥 Gestión de Equipos</h5>
+          <p class="text-secondary mt-3">
+            Asigná zonas, fechas y responsables fácilmente.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card-custom p-4 h-100">
+          <h5>📊 Estadísticas</h5>
+          <p class="text-secondary mt-3">
+            Seguimiento de progreso, rendimiento y resultados.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card-custom p-4 h-100">
+          <h5>⚡ Ultra Rápido</h5>
+          <p class="text-secondary mt-3">
+            Base de datos optimizada con bajo delay.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card-custom p-4 h-100">
+          <h5>🔒 Seguro</h5>
+          <p class="text-secondary mt-3">
+            Misiones privadas y control de accesos.
+          </p>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card-custom p-4 h-100">
+          <h5>📱 Multiplataforma</h5>
+          <p class="text-secondary mt-3">
+            Funciona en celular, tablet y PC.
+          </p>
+        </div>
+      </div>
+
     </div>
   </div>
+</section>
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
+<!-- MISIONES -->
+<section id="misiones" class="bg-dark">
+  <div class="container">
 
-    // ================== MISION DESDE URL ==================
-const params = new URLSearchParams(window.location.search);
-const MISION = params.get("mision");
+    <div class="text-center mb-5">
+      <h2 class="fw-bold">Misiones Disponibles</h2>
+      <p class="text-secondary">Accedé a cada proyecto activo</p>
+    </div>
 
-if (!MISION) {
-  alert("⚠️ Falta el parámetro ?mision= en la URL");
-  throw new Error("Misión no especificada");
-}
+    <div id="misionesContainer" class="row g-4 justify-content-center">
+      <!-- Se cargan por JS -->
+    </div>
 
-console.log("Misión activa:", MISION);
-// ======================================================
+  </div>
+</section>
 
-    const estadoColores = {
-      visitada: 'green',
-      no_atendieron: 'orange',
-      otro: 'gray'
-    };
+<!-- CONTACTO -->
+<section id="contacto">
+  <div class="container">
 
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 20,
-      attribution: '© OpenStreetMap contributors'
-    });
+    <div class="row justify-content-center">
+      <div class="col-lg-8 text-center">
 
-    const satelite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-      maxZoom: 20,
-      subdomains: ['mt0','mt1','mt2','mt3'],
-      attribution: '© Google Satellite'
-    });
+        <h2 class="fw-bold mb-4">¿Tenés una misión?</h2>
+        <p class="text-secondary mb-4">
+          Contactanos y te armamos tu sistema personalizado.
+        </p>
 
-    const mapa = L.map('map', {
-      center: [-31.61803, -64.38955],
-      zoom: 16,
-      maxZoom: 20,
-      layers: [osm]
-    });
+        <a href="https://wa.me/5493510000000?text=Hola!%20Tengo%20una%20misi%C3%B3n%20y%20quiero%20usar%20Casas%20Visitadas"
+           target="_blank"
+           class="btn btn-success btn-lg">
+          📲 Contactar por WhatsApp
+        </a>
 
-    let capaSateliteActiva = false;
-    let usuarioActual = null;
-    let mostrarVisitadas = true;
-    let marcadores = [];
-    let idSeleccionado = null;
-    let intervaloActualizacion = null;
-   let marcadorUbicacion = null;
+      </div>
+    </div>
 
-if (navigator.geolocation) {
-  const iconoUbicacion = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64113.png',
-    iconSize: [25, 25],
-    iconAnchor: [12, 24],
-    popupAnchor: [0, -25]
-  });
+  </div>
+</section>
 
-  const watchId = navigator.geolocation.watchPosition(pos => {
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-    const punto = [lat, lng];
+<!-- FOOTER -->
+<footer>
+  <div class="container text-center">
+    <p class="mb-1">© 2026 Casas Visitadas</p>
+    <small class="text-secondary">Sistema de gestión de misiones</small>
+  </div>
+</footer>
 
-    if (!marcadorUbicacion) {
-      marcadorUbicacion = L.marker(punto, { icon: iconoUbicacion })
-        .addTo(mapa)
-        .bindTooltip("Tu ubicación", { permanent: true, direction: 'top' })
-        .openTooltip();
+<!-- WhatsApp Floating -->
+<a class="whatsapp-btn"
+   href="https://wa.me/543518030737?text=Hola!%20Quiero%20usar%20Casas%20Visitadas"
+   target="_blank">
+  💬 WhatsApp
+</a>
 
-      mapa.setView(punto, 16);
+<!-- JS -->
+<script>
 
-      // Al hacer click en el mapa, ocultamos solo el tooltip
-      mapa.on('click', () => {
-        if (marcadorUbicacion && marcadorUbicacion.getTooltip()) {
-          marcadorUbicacion.unbindTooltip();
-        }
-      });
-    } else {
-      marcadorUbicacion.setLatLng(punto);
-    }
-  }, err => {
-    console.warn('No se pudo obtener tu ubicación:', err.message);
-  }, {
-    enableHighAccuracy: true,
-    maximumAge: 5000,
-    timeout: 10000
-  });
-}
+// Cambiá esto si tu backend tiene otro endpoint
+const API_CASAS = `/casas?mision=${encodeURIComponent(MISION)}`;
 
+async function cargarMisiones() {
+  try {
+    const res = await fetch(API_CASAS);
+    const casas = await res.json();
 
+    // Extraer misiones únicas
+    const misiones = [...new Set(
+      casas
+        .map(c => c.mision)
+        .filter(m => m && m.trim() !== '')
+    )];
 
-    document.getElementById('btnToggleSatelite').addEventListener('click', () => {
-      if (capaSateliteActiva) {
-        mapa.removeLayer(satelite);
-        mapa.addLayer(osm);
-        document.getElementById('btnToggleSatelite').innerText = "Mapa Satelital";
-      } else {
-        mapa.removeLayer(osm);
-        mapa.addLayer(satelite);
-        document.getElementById('btnToggleSatelite').innerText = "Mapa Normal";
-      }
-      capaSateliteActiva = !capaSateliteActiva;
-    });
+    const cont = document.getElementById('misionesContainer');
+    cont.innerHTML = '';
 
-    document.getElementById('btnToggleVisitadas').addEventListener('click', () => {
-      mostrarVisitadas = !mostrarVisitadas;
-      document.getElementById('btnToggleVisitadas').innerText = mostrarVisitadas ? 'Ocultar visitadas' : 'Mostrar visitadas';
-      if (usuarioActual) cargarCasas(usuarioActual);
-    });
-
-    document.getElementById('btnCargar').addEventListener('click', () => {
-      const user = document.getElementById('usuario').value.trim();
-      if (!user) return alert('Ingresá tu usuario');
-      usuarioActual = user;
-      cargarCasas(user);
-      intentarSincronizarPendientes();
-      iniciarActualizacionAutomatica();
-    });
-
-    function filtrarVisitadas(casas) {
-      return mostrarVisitadas ? casas : casas.filter(c => c.estado !== 'visitada');
+    if (misiones.length === 0) {
+      cont.innerHTML = '<p class="text-center text-secondary">No hay misiones activas</p>';
+      return;
     }
 
-    async function cargarCasas(usuario) {
-      try {
-        let todas;
+    misiones.forEach(mision => {
+      const col = document.createElement('div');
+      col.className = 'col-md-4 col-lg-3';
 
-        if (navigator.onLine) {
-          const res = await fetch(
-            `/casas?mision=${encodeURIComponent(MISION)}&usuario=${encodeURIComponent(usuario)}`
-          );
+      col.innerHTML = `
+        <div class="card-custom p-3 text-center h-100">
+          <h6 class="mb-3">${mision}</h6>
+          <button class="mission-btn" onclick="abrirMision('${encodeURIComponent(mision)}')">
+            Ver Mapa
+          </button>
+        </div>
+      `;
 
-          todas = await res.json();
-          localStorage.setItem('casas', JSON.stringify(todas));
-        } else {
-          // Solo mostramos este alert UNA VEZ
-          if (!window.alertOfflineMostrado) {
-            alert("Cargando casas guardadas offline...");
-            window.alertOfflineMostrado = true;
-          }
+      cont.appendChild(col);
+    });
 
-          const almacenadas = localStorage.getItem('casas');
-          if (!almacenadas) throw new Error("No hay casas guardadas offline");
-          todas = JSON.parse(almacenadas);
-        }
-
-        const asignadas = todas.filter(c => c.asignado_a && c.asignado_a.toLowerCase() === usuario.toLowerCase());
-        const casasFiltradas = filtrarVisitadas(asignadas);
-
-        marcadores.forEach(m => mapa.removeLayer(m));
-        marcadores = [];
-
-        casasFiltradas.forEach(casa => {
-          const color = estadoColores[casa.estado] || 'gray';
-          const marker = L.circleMarker([casa.latitud, casa.longitud], {
-            radius: 8,
-            color: 'blue',
-            fillColor: color,
-            fillOpacity: 0.8,
-            weight: 2,
-            casaId: casa.id
-          }).addTo(mapa);
-
-          marker.on('click', () => {
-            idSeleccionado = casa.id;
-            document.getElementById('comentario').value = casa.comentario || '';
-            new bootstrap.Modal(document.getElementById('estadoModal')).show();
-          });
-
-          marcadores.push(marker);
-        });
-
-      } catch (error) {
-        console.error("No se pudieron cargar casas:", error);
-      }
-    }
-
-
-
-    document.querySelectorAll('#botonesEstado button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const estado = btn.getAttribute('data-estado');
-    const comentario = document.getElementById('comentario').value;
-
-    const cambio = { id: idSeleccionado, estado, comentario };
-
-    if (navigator.onLine) {
-      // Si hay conexión, enviamos al servidor
-      fetch('/actualizar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cambio)
-      }).then(res => {
-        if (res.ok) {
-          bootstrap.Modal.getInstance(document.getElementById('estadoModal')).hide();
-          cargarCasas(usuarioActual);
-        } else alert('Error al actualizar');
-      });
-    } else {
-      // Si estamos offline, guardamos el cambio en localStorage
-      let pendientes = JSON.parse(localStorage.getItem('cambiosPendientes')) || [];
-      pendientes.push(cambio);
-      localStorage.setItem('cambiosPendientes', JSON.stringify(pendientes));
-
-      // Actualizamos también localmente la casa en "casas"
-      let casas = JSON.parse(localStorage.getItem('casas')) || [];
-      const idx = casas.findIndex(c => c.id === idSeleccionado);
-      if (idx !== -1) {
-        casas[idx].estado = estado;
-        casas[idx].comentario = comentario;
-        localStorage.setItem('casas', JSON.stringify(casas));
-      }
-
-      bootstrap.Modal.getInstance(document.getElementById('estadoModal')).hide();
-      cargarCasas(usuarioActual); // recargamos el mapa localmente
-    }
-  });
-});
-
-
-async function intentarSincronizarPendientes() {
-  let pendientes = JSON.parse(localStorage.getItem('cambiosPendientes')) || [];
-  if (pendientes.length === 0) return;
-
-  const noEnviados = [];
-  for (const cambio of pendientes) {
-    try {
-      const res = await fetch('/actualizar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cambio)
-      });
-      if (!res.ok) noEnviados.push(cambio);
-    } catch (err) {
-      noEnviados.push(cambio);
-    }
-  }
-
-  localStorage.setItem('cambiosPendientes', JSON.stringify(noEnviados));
-
-  if (pendientes.length !== noEnviados.length) {
-    await cargarCasas(usuarioActual);
-    console.log('Cambios offline sincronizados al iniciar sesión');
-    alert('Cambios offline sincronizados');
+  } catch (e) {
+    console.error(e);
   }
 }
 
+function abrirMision(mision) {
+  window.location.href = `/ver.html?mision=${mision}`;
+}
 
+cargarMisiones();
 
-    addEventListener('online', () => {
-      intentarSincronizarPendientes();
-    });
+</script>
 
-
-        function iniciarActualizacionAutomatica() {
-      if (intervaloActualizacion) clearInterval(intervaloActualizacion);
-      intervaloActualizacion = setInterval(() => {
-        if (usuarioActual) cargarCasas(usuarioActual);
-      }, 5000); // cada 5 segundos
-    }
-
-
-    function detenerActualizacionAutomatica() {
-      if (intervaloActualizacion) {
-        clearInterval(intervaloActualizacion);
-        intervaloActualizacion = null;
-      }
-    }
-
-  </script>
 </body>
 </html>

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Usuario - Casas asignadas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+    #map {
+      height: 75vh;
+      width: 100%;
+    }
+    .top-bar {
+      padding: 10px;
+    }
+    .estado-btn {
+      width: 100%;
+      padding: 15px;
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    .btn-visitada { background-color: green; }
+    .btn-no-atendieron { background-color: orange; }
+    .btn-otro { background-color: gray; }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <div class="panel container d-flex justify-content-center flex-wrap gap-2">
+      <input type="text" id="usuario" class="form-control" placeholder="Ingresá tu usuario" />
+      <button id="btnCargar" class="btn btn-primary">Cargar casas</button>
+      <button id="btnToggleVisitadas" class="btn btn-outline-secondary">Ocultar visitadas</button>
+      <button id="btnToggleSatelite" class="btn btn-outline-secondary">Mapa Satelital</button>
+      <button class="btn btn-sm btn-outline-info m-2" data-bs-toggle="modal" data-bs-target="#modalAyuda">¿No encontrás una casa?</button>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- Modal Estado -->
+  <div class="modal fade" id="estadoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Actualizar estado y comentario</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="botonesEstado" class="mb-3">
+            <button class="estado-btn btn-visitada" data-estado="visitada">Visitada</button>
+            <button class="estado-btn btn-no-atendieron" data-estado="no_atendieron">No atendieron</button>
+            <button class="estado-btn btn-otro" data-estado="otro">Otro</button>
+          </div>
+          <textarea id="comentario" class="form-control" placeholder="Comentario..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Ayuda -->
+  <div class="modal fade" id="modalAyuda" tabindex="-1" aria-labelledby="modalAyudaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalAyudaLabel">¿No encontrás una casa?</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          Si llegaste a una casa que no está marcada en el mapa:
+          <ul>
+            <li>Tomale una captura de pantalla al mapa y señalala</li>
+            <li>O buscala en Google Maps y copiá las coordenadas</li>
+            <li>Después informanos para agregarla manualmente</li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+
+    // ================== MISION DESDE URL ==================
+const params = new URLSearchParams(window.location.search);
+const MISION = params.get("mision");
+
+if (!MISION) {
+  alert("⚠️ Falta el parámetro ?mision= en la URL");
+  throw new Error("Misión no especificada");
+}
+
+console.log("Misión activa:", MISION);
+// ======================================================
+
+    const estadoColores = {
+      visitada: 'green',
+      no_atendieron: 'orange',
+      otro: 'gray'
+    };
+
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 20,
+      attribution: '© OpenStreetMap contributors'
+    });
+
+    const satelite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0','mt1','mt2','mt3'],
+      attribution: '© Google Satellite'
+    });
+
+    const mapa = L.map('map', {
+      center: [-31.61803, -64.38955],
+      zoom: 16,
+      maxZoom: 20,
+      layers: [osm]
+    });
+
+    let capaSateliteActiva = false;
+    let usuarioActual = null;
+    let mostrarVisitadas = true;
+    let marcadores = [];
+    let idSeleccionado = null;
+    let intervaloActualizacion = null;
+   let marcadorUbicacion = null;
+
+if (navigator.geolocation) {
+  const iconoUbicacion = L.icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64113.png',
+    iconSize: [25, 25],
+    iconAnchor: [12, 24],
+    popupAnchor: [0, -25]
+  });
+
+  const watchId = navigator.geolocation.watchPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    const punto = [lat, lng];
+
+    if (!marcadorUbicacion) {
+      marcadorUbicacion = L.marker(punto, { icon: iconoUbicacion })
+        .addTo(mapa)
+        .bindTooltip("Tu ubicación", { permanent: true, direction: 'top' })
+        .openTooltip();
+
+      mapa.setView(punto, 16);
+
+      // Al hacer click en el mapa, ocultamos solo el tooltip
+      mapa.on('click', () => {
+        if (marcadorUbicacion && marcadorUbicacion.getTooltip()) {
+          marcadorUbicacion.unbindTooltip();
+        }
+      });
+    } else {
+      marcadorUbicacion.setLatLng(punto);
+    }
+  }, err => {
+    console.warn('No se pudo obtener tu ubicación:', err.message);
+  }, {
+    enableHighAccuracy: true,
+    maximumAge: 5000,
+    timeout: 10000
+  });
+}
+
+
+
+    document.getElementById('btnToggleSatelite').addEventListener('click', () => {
+      if (capaSateliteActiva) {
+        mapa.removeLayer(satelite);
+        mapa.addLayer(osm);
+        document.getElementById('btnToggleSatelite').innerText = "Mapa Satelital";
+      } else {
+        mapa.removeLayer(osm);
+        mapa.addLayer(satelite);
+        document.getElementById('btnToggleSatelite').innerText = "Mapa Normal";
+      }
+      capaSateliteActiva = !capaSateliteActiva;
+    });
+
+    document.getElementById('btnToggleVisitadas').addEventListener('click', () => {
+      mostrarVisitadas = !mostrarVisitadas;
+      document.getElementById('btnToggleVisitadas').innerText = mostrarVisitadas ? 'Ocultar visitadas' : 'Mostrar visitadas';
+      if (usuarioActual) cargarCasas(usuarioActual);
+    });
+
+    document.getElementById('btnCargar').addEventListener('click', () => {
+      const user = document.getElementById('usuario').value.trim();
+      if (!user) return alert('Ingresá tu usuario');
+      usuarioActual = user;
+      cargarCasas(user);
+      intentarSincronizarPendientes();
+      iniciarActualizacionAutomatica();
+    });
+
+    function filtrarVisitadas(casas) {
+      return mostrarVisitadas ? casas : casas.filter(c => c.estado !== 'visitada');
+    }
+
+    async function cargarCasas(usuario) {
+      try {
+        let todas;
+
+        if (navigator.onLine) {
+          const res = await fetch(
+            `/casas?mision=${encodeURIComponent(MISION)}&usuario=${encodeURIComponent(usuario)}`
+          );
+
+          todas = await res.json();
+          localStorage.setItem('casas', JSON.stringify(todas));
+        } else {
+          // Solo mostramos este alert UNA VEZ
+          if (!window.alertOfflineMostrado) {
+            alert("Cargando casas guardadas offline...");
+            window.alertOfflineMostrado = true;
+          }
+
+          const almacenadas = localStorage.getItem('casas');
+          if (!almacenadas) throw new Error("No hay casas guardadas offline");
+          todas = JSON.parse(almacenadas);
+        }
+
+        const asignadas = todas.filter(c => c.asignado_a && c.asignado_a.toLowerCase() === usuario.toLowerCase());
+        const casasFiltradas = filtrarVisitadas(asignadas);
+
+        marcadores.forEach(m => mapa.removeLayer(m));
+        marcadores = [];
+
+        casasFiltradas.forEach(casa => {
+          const color = estadoColores[casa.estado] || 'gray';
+          const marker = L.circleMarker([casa.latitud, casa.longitud], {
+            radius: 8,
+            color: 'blue',
+            fillColor: color,
+            fillOpacity: 0.8,
+            weight: 2,
+            casaId: casa.id
+          }).addTo(mapa);
+
+          marker.on('click', () => {
+            idSeleccionado = casa.id;
+            document.getElementById('comentario').value = casa.comentario || '';
+            new bootstrap.Modal(document.getElementById('estadoModal')).show();
+          });
+
+          marcadores.push(marker);
+        });
+
+      } catch (error) {
+        console.error("No se pudieron cargar casas:", error);
+      }
+    }
+
+
+
+    document.querySelectorAll('#botonesEstado button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const estado = btn.getAttribute('data-estado');
+    const comentario = document.getElementById('comentario').value;
+
+    const cambio = { id: idSeleccionado, estado, comentario };
+
+    if (navigator.onLine) {
+      // Si hay conexión, enviamos al servidor
+      fetch('/actualizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cambio)
+      }).then(res => {
+        if (res.ok) {
+          bootstrap.Modal.getInstance(document.getElementById('estadoModal')).hide();
+          cargarCasas(usuarioActual);
+        } else alert('Error al actualizar');
+      });
+    } else {
+      // Si estamos offline, guardamos el cambio en localStorage
+      let pendientes = JSON.parse(localStorage.getItem('cambiosPendientes')) || [];
+      pendientes.push(cambio);
+      localStorage.setItem('cambiosPendientes', JSON.stringify(pendientes));
+
+      // Actualizamos también localmente la casa en "casas"
+      let casas = JSON.parse(localStorage.getItem('casas')) || [];
+      const idx = casas.findIndex(c => c.id === idSeleccionado);
+      if (idx !== -1) {
+        casas[idx].estado = estado;
+        casas[idx].comentario = comentario;
+        localStorage.setItem('casas', JSON.stringify(casas));
+      }
+
+      bootstrap.Modal.getInstance(document.getElementById('estadoModal')).hide();
+      cargarCasas(usuarioActual); // recargamos el mapa localmente
+    }
+  });
+});
+
+
+async function intentarSincronizarPendientes() {
+  let pendientes = JSON.parse(localStorage.getItem('cambiosPendientes')) || [];
+  if (pendientes.length === 0) return;
+
+  const noEnviados = [];
+  for (const cambio of pendientes) {
+    try {
+      const res = await fetch('/actualizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cambio)
+      });
+      if (!res.ok) noEnviados.push(cambio);
+    } catch (err) {
+      noEnviados.push(cambio);
+    }
+  }
+
+  localStorage.setItem('cambiosPendientes', JSON.stringify(noEnviados));
+
+  if (pendientes.length !== noEnviados.length) {
+    await cargarCasas(usuarioActual);
+    console.log('Cambios offline sincronizados al iniciar sesión');
+    alert('Cambios offline sincronizados');
+  }
+}
+
+
+
+    addEventListener('online', () => {
+      intentarSincronizarPendientes();
+    });
+
+
+        function iniciarActualizacionAutomatica() {
+      if (intervaloActualizacion) clearInterval(intervaloActualizacion);
+      intervaloActualizacion = setInterval(() => {
+        if (usuarioActual) cargarCasas(usuarioActual);
+      }, 5000); // cada 5 segundos
+    }
+
+
+    function detenerActualizacionAutomatica() {
+      if (intervaloActualizacion) {
+        clearInterval(intervaloActualizacion);
+        intervaloActualizacion = null;
+      }
+    }
+
+  </script>
+</body>
+</html>
