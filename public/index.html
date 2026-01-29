@@ -214,7 +214,10 @@ if (navigator.geolocation) {
         let todas;
 
         if (navigator.onLine) {
-          const res = await fetch(`/casas?mision=${encodeURIComponent(MISION)}?usuario=${usuario}`);
+          const res = await fetch(
+            `/casas?mision=${encodeURIComponent(MISION)}&usuario=${encodeURIComponent(usuario)}`
+          );
+
           todas = await res.json();
           localStorage.setItem('casas', JSON.stringify(todas));
         } else {
