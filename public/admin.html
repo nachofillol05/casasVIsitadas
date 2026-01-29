@@ -46,6 +46,19 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script>
 
+    // ================== MISION DESDE URL ==================
+const params = new URLSearchParams(window.location.search);
+const MISION = params.get("mision");
+
+if (!MISION) {
+  alert("⚠️ Falta el parámetro ?mision= en la URL");
+  throw new Error("Misión no especificada");
+}
+
+console.log("Misión activa:", MISION);
+// ======================================================
+
+
     flatpickr("#fechaAsignacionWrap", {
   wrap: true,
   dateFormat: "Y-m-d",
@@ -195,12 +208,15 @@
   });
 
   document.getElementById('btnVerEstadisticas').addEventListener('click', () => {
-    window.location.href = '/estadisticas.html';
+    window.location.href = `/estadisticas.html?mision=${encodeURIComponent(MISION)}`;
   });
 
+
+
   document.getElementById('btnModoEdicion').addEventListener('click', () => {
-    window.location.href = '/editar.html';
+    window.location.href = `/editar.html?mision=${encodeURIComponent(MISION)}`;
   });
+
 
   document.getElementById('filtroUsuario').addEventListener('input', e => {
     usuarioFiltro = e.target.value.trim().toLowerCase();
@@ -218,7 +234,7 @@
 
 
   async function cargarCasas() {
-    const res = await fetch('/casas');
+    const res = await fetch(`/casas?mision=${encodeURIComponent(MISION)}`);
     const casas = await res.json();
 
     marcadores.forEach(m => mapa.removeLayer(m));

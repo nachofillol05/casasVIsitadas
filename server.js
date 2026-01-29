@@ -8,10 +8,10 @@ app.use(express.static('public')); // sirviendo archivos públicos
 
 // VOLVER AL ANTEERIOR SI NO SANDSAAAAAAAA 
 app.get('/casas', async (req, res) => {
-  const { usuario } = req.query;
+  const { usuario, mision } = req.query;
 
   try {
-    if (usuario) {
+    if (usuario && mision) {
       const result = await pool.query(
   `
   SELECT *
@@ -19,13 +19,14 @@ app.get('/casas', async (req, res) => {
   WHERE asignado_a ILIKE $1
     AND fecha_asignacion IS NOT NULL
     AND fecha_asignacion::date <= CURRENT_DATE
+    AND mision=$2
   ORDER BY fecha_asignacion ASC
   `,
-  [usuario]
+  [usuario, mision]
 );
       return res.json(result.rows);
-    } else {
-      const result = await pool.query('SELECT * FROM casas');
+    } else if (mision) {
+      const result = await pool.query('SELECT * FROM casas where mision=$1', [mision]);
       return res.json(result.rows);
     }
   } catch (e) {
@@ -91,50 +92,16 @@ app.post('/actualizar', async (req, res) => {
   }
 });
 
-// Endpoint para estadísticas
-app.get('/stats', async (req, res) => {
-  try {
-    const casasRes = await pool.query('SELECT * FROM casas');
-    const casas = casasRes.rows;
 
-    // Comentarios por casa
-    const comentarios = casas.map(c => ({
-      id: c.id,
-      direccion: c.direccion,
-      asignado_a: c.asignado_a,
-      estado: c.estado,
-      comentario: c.comentario
-    }));
-
-    // Casas visitadas por persona
-    const visitadas = {};
-    // Casas asignadas por persona
-    const asignadas = {};
-
-    casas.forEach(c => {
-      if (c.asignado_a) {
-        asignadas[c.asignado_a] = (asignadas[c.asignado_a] || 0) + 1;
-        if (c.estado === 'visitada') {
-          visitadas[c.asignado_a] = (visitadas[c.asignado_a] || 0) + 1;
-        }
-      }
-    });
-
-    res.json({ comentarios, visitadas, asignadas });
-  } catch (e) {
-    console.error(e);
-    res.status(500).send('Error al obtener estadísticas');
-  }
-});
 
 app.post('/agregar', async (req, res) => {
-  const { direccion, latitud, longitud } = req.body;
-  if (!direccion || !latitud || !longitud) {
+  const { direccion, latitud, longitud, mision } = req.body;
+  if (!direccion || !latitud || !longitud || !mision) {
     return res.status(400).send('Faltan datos');
   }
   try {
-    const q = 'INSERT INTO casas (direccion, latitud, longitud) VALUES ($1, $2, $3)';
-    await pool.query(q, [direccion, latitud, longitud]);
+    const q = 'INSERT INTO casas (direccion, latitud, longitud, mision) VALUES ($1, $2, $3, $4)';
+    await pool.query(q, [direccion, latitud, longitud, mision]);
     res.sendStatus(200);
   } catch (e) {
     console.error(e);

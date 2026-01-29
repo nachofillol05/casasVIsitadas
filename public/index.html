@@ -91,6 +91,19 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+
+    // ================== MISION DESDE URL ==================
+const params = new URLSearchParams(window.location.search);
+const MISION = params.get("mision");
+
+if (!MISION) {
+  alert("⚠️ Falta el parámetro ?mision= en la URL");
+  throw new Error("Misión no especificada");
+}
+
+console.log("Misión activa:", MISION);
+// ======================================================
+
     const estadoColores = {
       visitada: 'green',
       no_atendieron: 'orange',
@@ -201,7 +214,7 @@ if (navigator.geolocation) {
         let todas;
 
         if (navigator.onLine) {
-          const res = await fetch(`/casas?usuario=${usuario}`);
+          const res = await fetch(`/casas?mision=${encodeURIComponent(MISION)}?usuario=${usuario}`);
           todas = await res.json();
           localStorage.setItem('casas', JSON.stringify(todas));
         } else {

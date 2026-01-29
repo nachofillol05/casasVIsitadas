@@ -37,6 +37,19 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
+
+  // ================== MISION DESDE URL ==================
+const params = new URLSearchParams(window.location.search);
+const MISION = params.get("mision");
+
+if (!MISION) {
+  alert("⚠️ Falta el parámetro ?mision= en la URL");
+  throw new Error("Misión no especificada");
+}
+
+console.log("Misión activa:", MISION);
+// ======================================================
+
 /* ================= CONFIG ================= */
 
 const estadoColores = {
@@ -106,7 +119,7 @@ let tooltips = [];
 
 async function cargarCasas() {
   try {
-    const res = await fetch('/casas');
+    const res = await fetch(`/casas?mision=${encodeURIComponent(MISION)}`);
     const casas = await res.json();
 
     marcadores.forEach(m => mapa.removeLayer(m));
