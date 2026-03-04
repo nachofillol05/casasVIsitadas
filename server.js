@@ -6,32 +6,125 @@ const pool = require('./db'); // tu pool pg o conexión a DB
 app.use(express.json());
 app.use(express.static('public')); // sirviendo archivos públicos
 
-// VOLVER AL ANTEERIOR SI NO SANDSAAAAAAAA 
+
 app.get('/casas', async (req, res) => {
-  const { usuario, mision } = req.query;
+  const { usuario, mision, fechaInicio, fechaFin } = req.query;
 
   try {
-    if (usuario && mision) {
-      const result = await pool.query(
-  `
-  SELECT *
-  FROM casas
-  WHERE asignado_a ILIKE $1
-    AND fecha_asignacion IS NOT NULL
-    AND fecha_asignacion::date <= CURRENT_DATE
-    AND mision=$2
-  ORDER BY fecha_asignacion ASC
-  `,
-  [usuario, mision]
-);
-      return res.json(result.rows);
-    } else if (mision) {
-      const result = await pool.query('SELECT * FROM casas where mision=$1', [mision]);
-      return res.json(result.rows);
-    }else {
-      const result = await pool.query('SELECT * FROM casas');
-      return res.json(result.rows);
+
+    // 🔵 CASO USUARIO (tiene usuario → es user normal)
+    if (usuario) {
+
+  const q = `
+    SELECT 
+      c.*,
+
+      -- 🔥 Estado calculado SOLO para este usuario
+      (
+        SELECT 
+          CASE 
+            WHEN MAX(
+              CASE 
+                WHEN v2.estado = 'visitada' THEN 3
+                WHEN v2.estado = 'no_atendieron' THEN 2
+                WHEN v2.estado = 'otro' THEN 1
+                ELSE 0
+              END
+            ) = 3 THEN 'visitada'
+            WHEN MAX(
+              CASE 
+                WHEN v2.estado = 'visitada' THEN 3
+                WHEN v2.estado = 'no_atendieron' THEN 2
+                WHEN v2.estado = 'otro' THEN 1
+                ELSE 0
+              END
+            ) = 2 THEN 'no_atendieron'
+            WHEN MAX(
+              CASE 
+                WHEN v2.estado = 'visitada' THEN 3
+                WHEN v2.estado = 'no_atendieron' THEN 2
+                WHEN v2.estado = 'otro' THEN 1
+                ELSE 0
+              END
+            ) = 1 THEN 'otro'
+            ELSE NULL
+          END
+        FROM visitas v2
+        WHERE v2.casa_id = c.id
+        AND v2.usuario = $1
+      ) as estado,
+
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'estado', v.estado,
+            'comentario', v.comentario,
+            'fecha', v.fecha
+          )
+        ) FILTER (WHERE v.usuario = $1),
+        '[]'
+      ) as historial
+
+    FROM casas c
+    LEFT JOIN visitas v ON v.casa_id = c.id
+
+    WHERE c.asignado_a ILIKE $1
+    ${mision ? 'AND c.mision = $2' : ''}
+
+    GROUP BY c.id
+    ORDER BY c.fecha_asignacion ASC
+  `;
+
+  const params = mision ? [usuario, mision] : [usuario];
+
+  const result = await pool.query(q, params);
+  return res.json(result.rows);
+}
+
+    // 🟢 CASO ADMIN (no hay usuario)
+
+    let whereConditions = [];
+    let params = [];
+
+    if (mision) {
+      params.push(mision);
+      whereConditions.push(`c.mision = $${params.length}`);
     }
+
+    if (fechaInicio && fechaFin) {
+      params.push(fechaInicio);
+      params.push(fechaFin);
+      whereConditions.push(`v.fecha BETWEEN $${params.length - 1} AND $${params.length}`);
+    }
+
+    const whereClause = whereConditions.length
+      ? `WHERE ${whereConditions.join(' AND ')}`
+      : '';
+
+    const q = `
+      SELECT 
+        c.*,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'usuario', v.usuario,
+              'estado', v.estado,
+              'comentario', v.comentario,
+              'fecha', v.fecha
+            )
+          ) FILTER (WHERE v.id IS NOT NULL),
+          '[]'
+        ) as historial
+      FROM casas c
+      LEFT JOIN visitas v ON v.casa_id = c.id
+      ${whereClause}
+      GROUP BY c.id
+      ORDER BY c.id ASC
+    `;
+
+    const result = await pool.query(q, params);
+    return res.json(result.rows);
+
   } catch (e) {
     console.error(e);
     res.status(500).send('Error al obtener casas');
@@ -72,7 +165,7 @@ app.post('/desasignar', async (req, res) => {
     return res.status(400).send('Faltan datos');
   }
   try {
-    const q = 'UPDATE casas SET asignado_a = NULL, estado = NULL, comentario = NULL WHERE id = ANY($1::int[])';
+    const q = 'UPDATE casas SET asignado_a = NULL WHERE id = ANY($1::int[])';
     await pool.query(q, [ids]);
     res.sendStatus(200);
   } catch (e) {
@@ -81,20 +174,67 @@ app.post('/desasignar', async (req, res) => {
   }
 });
 
-// Endpoint para actualizar estado y comentario de casa
 app.post('/actualizar', async (req, res) => {
-  const { id, estado, comentario } = req.body;
-  if (!id || !estado) return res.status(400).send('Faltan datos');
+  const { id, estado, comentario, usuario } = req.body;
+
+  if (!id || !estado || !usuario)
+    return res.status(400).send('Faltan datos');
+
+  const client = await pool.connect();
+
   try {
-    const q = 'UPDATE casas SET estado = $1, comentario = $2 WHERE id = $3';
-    await pool.query(q, [estado, comentario, id]);
+    await client.query('BEGIN');
+
+    // 1️⃣ Insertar visita
+    await client.query(
+      `
+      INSERT INTO visitas (casa_id, usuario, estado, comentario)
+      VALUES ($1, $2, $3, $4)
+      `,
+      [id, usuario, estado, comentario]
+    );
+
+    // 2️⃣ Recalcular estado con prioridad
+    const prioridadQuery = `
+      SELECT 
+        MAX(
+          CASE 
+            WHEN estado = 'visitada' THEN 3
+            WHEN estado = 'no_atendieron' THEN 2
+            WHEN estado = 'otro' THEN 1
+            ELSE 0
+          END
+        ) as prioridad
+      FROM visitas
+      WHERE casa_id = $1
+    `;
+
+    const r = await client.query(prioridadQuery, [id]);
+    const prioridad = Number(r.rows[0].prioridad);
+
+    let estadoFinal = null;
+
+    if (prioridad === 3) estadoFinal = 'visitada';
+    else if (prioridad === 2) estadoFinal = 'no_atendieron';
+    else if (prioridad === 1) estadoFinal = 'otro';
+
+    await client.query(
+      `UPDATE casas SET estado = $1 WHERE id = $2`,
+      [estadoFinal, id]
+    );
+
+    await client.query('COMMIT');
+
     res.sendStatus(200);
+
   } catch (e) {
+    await client.query('ROLLBACK');
     console.error(e);
     res.status(500).send('Error al actualizar');
+  } finally {
+    client.release();
   }
 });
-
 
 
 app.post('/agregar', async (req, res) => {

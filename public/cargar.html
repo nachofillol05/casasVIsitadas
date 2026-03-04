@@ -251,7 +251,7 @@ if (navigator.geolocation) {
 
           marker.on('click', () => {
             idSeleccionado = casa.id;
-            document.getElementById('comentario').value = casa.comentario || '';
+            document.getElementById('comentario').value = '';
             new bootstrap.Modal(document.getElementById('estadoModal')).show();
           });
 
@@ -270,7 +270,12 @@ if (navigator.geolocation) {
     const estado = btn.getAttribute('data-estado');
     const comentario = document.getElementById('comentario').value;
 
-    const cambio = { id: idSeleccionado, estado, comentario };
+    const cambio = { 
+  id: idSeleccionado, 
+  estado, 
+  comentario,
+  usuario: usuarioActual
+};
 
     if (navigator.onLine) {
       // Si hay conexión, enviamos al servidor

@@ -147,8 +147,6 @@ async function cargarCasas() {
         Asignado a: ${casa.asignado_a || 'nadie'}<br>
         Día: ${toLocalDate(casa.fecha_asignacion)}<br>
         <hr>
-        <b>Comentario:</b><br>
-        ${casa.comentario ? casa.comentario : '<i>Sin comentario</i>'}
       `);
 
       if (casa.asignado_a) {
