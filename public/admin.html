@@ -70,7 +70,29 @@ if (!MISION) {
   throw new Error("Misión no especificada");
 }
 
-console.log("Misión activa:", MISION);
+async function centrarMapa(nombreMision) {
+  try {
+    const res = await fetch(`/centro?nombre=${encodeURIComponent(nombreMision)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      mapa.setView([-31.426512, -64.176008], 16);
+      console.error(data.error);
+      return;
+    }
+
+    const lat = parseFloat(data.latitud);
+    const lon = parseFloat(data.longitud);
+
+    mapa.setView([lat, lon], 16);
+
+  } catch (err) {
+    mapa.setView([-31.426512, -64.176008], 16);
+    console.error("Error obteniendo centro:", err);
+  }
+}
+centrarMapa(MISION);
+
 // ======================================================
 
 
@@ -87,7 +109,9 @@ console.log("Misión activa:", MISION);
   const estadoColores = {
     visitada: 'green',
     no_atendieron: 'orange',
-    otro: 'gray'
+    otro: 'gray',
+    peregrina: 'blue',
+    volver: 'red'
   };
 
   const coloresUsuarios = {};
@@ -114,9 +138,7 @@ console.log("Misión activa:", MISION);
   });
 
   const mapa = L.map('map', {
-    center: [-31.61803, -64.38955],
     zoom: 15,
-    maxZoom: 18,
     layers: [osm]
   });
 
@@ -184,7 +206,7 @@ console.log("Misión activa:", MISION);
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       usuario,
-      fecha,              // 🆕 se envía la fecha
+      fecha,              
       ids: [...seleccionadas]
     })
   });
@@ -258,7 +280,7 @@ console.log("Misión activa:", MISION);
     tooltips = [];
 
     const filtradas = casas.filter(c => {
-      const visible = mostrarVisitadas || c.estado !== 'visitada';
+      const visible = mostrarVisitadas || (c.estado !== 'visitada' && c.estado !== 'volver' && c.estado !== 'peregrina');
       const coincideUsuario = !usuarioFiltro || (c.asignado_a || '').toLowerCase().includes(usuarioFiltro);
       return visible && coincideUsuario;
     });
@@ -296,7 +318,7 @@ console.log("Misión activa:", MISION);
      marker.on('click', () => {
 
   // 🟢 Si está visitada → mostrar modal con historial
-  if ((casa.estado === 'visitada' || casa.estado === 'no_atendieron')&& casa.historial && casa.historial.length > 0) {
+  if ((casa.estado != 'otro')&& casa.historial && casa.historial.length > 0) {
 
     const cont = document.getElementById('historialContenido');
 

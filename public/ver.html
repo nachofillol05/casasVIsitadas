@@ -47,7 +47,28 @@ if (!MISION) {
   throw new Error("Misión no especificada");
 }
 
-console.log("Misión activa:", MISION);
+async function centrarMapa(nombreMision) {
+  try {
+    const res = await fetch(`/centro?nombre=${encodeURIComponent(nombreMision)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      mapa.setView([-31.426512, -64.176008], 16);
+      console.error(data.error);
+      return;
+    }
+
+    const lat = parseFloat(data.latitud);
+    const lon = parseFloat(data.longitud);
+
+    mapa.setView([lat, lon], 16);
+
+  } catch (err) {
+    console.error("Error obteniendo centro:", err);
+    mapa.setView([-31.426512, -64.176008], 16);
+  }
+}
+centrarMapa(MISION);
 // ======================================================
 
 /* ================= CONFIG ================= */
@@ -55,7 +76,9 @@ console.log("Misión activa:", MISION);
 const estadoColores = {
   visitada: 'green',
   no_atendieron: 'orange',
-  otro: 'gray'
+  otro: 'gray',
+  volver: 'red',
+  peregrina: 'blue'
 };
 
 const coloresUsuarios = {};
@@ -97,7 +120,6 @@ const satelite = L.tileLayer(
 /* ================= MAPA ================= */
 
 const mapa = L.map('map', {
-  center: [-31.61803, -64.38955],
   zoom: 15,
   layers: [osm]
 });
@@ -176,7 +198,6 @@ async function cargarCasas() {
     }
 
   } catch (err) {
-    console.error('Error cargando casas:', err);
   }
 }
 

@@ -23,8 +23,30 @@ app.get('/casas', async (req, res) => {
       (
         SELECT 
           CASE 
+          WHEN MAX(
+              CASE 
+                WHEN v2.estado = 'volver' THEN 5
+                WHEN v2.estado = 'peregrina' THEN 4
+                WHEN v2.estado = 'visitada' THEN 3
+                WHEN v2.estado = 'no_atendieron' THEN 2
+                WHEN v2.estado = 'otro' THEN 1
+                ELSE 0
+              END
+            ) = 5 THEN 'volver'
             WHEN MAX(
               CASE 
+                WHEN v2.estado = 'volver' THEN 5
+                WHEN v2.estado = 'peregrina' THEN 4
+                WHEN v2.estado = 'visitada' THEN 3
+                WHEN v2.estado = 'no_atendieron' THEN 2
+                WHEN v2.estado = 'otro' THEN 1
+                ELSE 0
+              END
+            ) = 4 THEN 'peregrina'
+            WHEN MAX(
+              CASE 
+                WHEN v2.estado = 'volver' THEN 5
+                WHEN v2.estado = 'peregrina' THEN 4
                 WHEN v2.estado = 'visitada' THEN 3
                 WHEN v2.estado = 'no_atendieron' THEN 2
                 WHEN v2.estado = 'otro' THEN 1
@@ -33,6 +55,8 @@ app.get('/casas', async (req, res) => {
             ) = 3 THEN 'visitada'
             WHEN MAX(
               CASE 
+                WHEN v2.estado = 'volver' THEN 5
+                WHEN v2.estado = 'peregrina' THEN 4
                 WHEN v2.estado = 'visitada' THEN 3
                 WHEN v2.estado = 'no_atendieron' THEN 2
                 WHEN v2.estado = 'otro' THEN 1
@@ -41,12 +65,14 @@ app.get('/casas', async (req, res) => {
             ) = 2 THEN 'no_atendieron'
             WHEN MAX(
               CASE 
+                WHEN v2.estado = 'volver' THEN 5
+                WHEN v2.estado = 'peregrina' THEN 4
                 WHEN v2.estado = 'visitada' THEN 3
                 WHEN v2.estado = 'no_atendieron' THEN 2
                 WHEN v2.estado = 'otro' THEN 1
                 ELSE 0
               END
-            ) = 1 THEN 'otro'
+            ) = 3 THEN 'otro'
             ELSE NULL
           END
         FROM visitas v2
@@ -194,11 +220,14 @@ app.post('/actualizar', async (req, res) => {
       [id, usuario, estado, comentario]
     );
 
+    console.log('estado');
     // 2️⃣ Recalcular estado con prioridad
     const prioridadQuery = `
       SELECT 
         MAX(
           CASE 
+            WHEN estado = 'volver' THEN 5
+            WHEN estado = 'peregrina' THEN 4
             WHEN estado = 'visitada' THEN 3
             WHEN estado = 'no_atendieron' THEN 2
             WHEN estado = 'otro' THEN 1
@@ -209,14 +238,19 @@ app.post('/actualizar', async (req, res) => {
       WHERE casa_id = $1
     `;
 
+    
+
     const r = await client.query(prioridadQuery, [id]);
     const prioridad = Number(r.rows[0].prioridad);
 
     let estadoFinal = null;
 
-    if (prioridad === 3) estadoFinal = 'visitada';
+    if (prioridad === 5) estadoFinal = 'volver';
+    else if (prioridad === 4) estadoFinal = 'peregrina';
+    else if (prioridad === 3) estadoFinal = 'visitada';
     else if (prioridad === 2) estadoFinal = 'no_atendieron';
     else if (prioridad === 1) estadoFinal = 'otro';
+
 
     await client.query(
       `UPDATE casas SET estado = $1 WHERE id = $2`,
@@ -263,6 +297,66 @@ app.post('/eliminar', async (req, res) => {
     res.status(500).send('Error al eliminar casa');
   }
 });
+
+
+app.get('/centro', async (req, res) => {
+  const { nombre } = req.query;
+
+  if (!nombre) {
+    return res.status(400).json({ error: "Falta nombre de misión" });
+  }
+
+  try {
+
+    // 1️⃣ buscar si ya existe
+    const q1 = `
+      SELECT latitud, longitud
+      FROM mision
+      WHERE nombre = $1
+      LIMIT 1
+    `;
+
+    const result = await pool.query(q1, [nombre]);
+
+    // si ya existe centro guardado
+    if (result.rows.length && result.rows[0].latitud && result.rows[0].longitud) {
+      return res.json(result.rows[0]);
+    }
+
+    // 2️⃣ calcular desde casas
+    const q2 = `
+      SELECT 
+        AVG(latitud) as latitud,
+        AVG(longitud) as longitud
+      FROM casas
+      WHERE mision = $1
+    `;
+
+    const centro = await pool.query(q2, [nombre]);
+
+    if (!centro.rows.length || !centro.rows[0].latitud) {
+      return res.status(404).json({ error: "No hay casas para calcular centro" });
+    }
+
+    const { latitud, longitud } = centro.rows[0];
+
+    // 3️⃣ guardar el centro calculado
+    const q3 = `
+      INSERT INTO mision (nombre, latitud, longitud)
+      VALUES ($1,$2,$3)
+    `;
+
+    await pool.query(q3, [nombre, latitud, longitud]);
+
+    res.json({ latitud, longitud });
+
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Error obteniendo centro" });
+  }
+});
+
+
 
 
 const port = process.env.PORT || 3000;

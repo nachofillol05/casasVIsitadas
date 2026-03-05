@@ -30,6 +30,9 @@
     }
     .btn-visitada { background-color: green; }
     .btn-no-atendieron { background-color: orange; }
+    .btn-peregrina { background-color: blue; }
+    .btn-volver { background-color: red; }
+
     .btn-otro { background-color: gray; }
   </style>
 </head>
@@ -57,6 +60,8 @@
           <div id="botonesEstado" class="mb-3">
             <button class="estado-btn btn-visitada" data-estado="visitada">Visitada</button>
             <button class="estado-btn btn-no-atendieron" data-estado="no_atendieron">No atendieron</button>
+            <button class="estado-btn btn-peregrina" data-estado="peregrina">Hay peregrina</button>
+            <button class="estado-btn btn-volver" data-estado="volver">Visitar de nuevo</button>
             <button class="estado-btn btn-otro" data-estado="otro">Otro</button>
           </div>
           <textarea id="comentario" class="form-control" placeholder="Comentario..."></textarea>
@@ -101,13 +106,37 @@ if (!MISION) {
   throw new Error("Misión no especificada");
 }
 
-console.log("Misión activa:", MISION);
+async function centrarMapa(nombreMision) {
+  try {
+    const res = await fetch(`/centro?nombre=${encodeURIComponent(nombreMision)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      mapa.setView([-31.426512, -64.176008], 16);
+      console.error(data.error);
+      return;
+    }
+
+    const lat = parseFloat(data.latitud);
+    const lon = parseFloat(data.longitud);
+
+    mapa.setView([lat, lon], 16);
+
+  } catch (err) {
+    console.error("Error obteniendo centro:", err);
+    mapa.setView([-31.426512, -64.176008], 16);
+  }
+}
+centrarMapa(MISION);
+
 // ======================================================
 
     const estadoColores = {
       visitada: 'green',
       no_atendieron: 'orange',
-      otro: 'gray'
+      otro: 'gray',
+      peregrina: 'blue',
+      volver: 'red'
     };
 
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -122,7 +151,6 @@ console.log("Misión activa:", MISION);
     });
 
     const mapa = L.map('map', {
-      center: [-31.61803, -64.38955],
       zoom: 16,
       maxZoom: 20,
       layers: [osm]
@@ -269,13 +297,14 @@ if (navigator.geolocation) {
   btn.addEventListener('click', () => {
     const estado = btn.getAttribute('data-estado');
     const comentario = document.getElementById('comentario').value;
+    console.log(estado, comentario);
 
     const cambio = { 
-  id: idSeleccionado, 
-  estado, 
-  comentario,
-  usuario: usuarioActual
-};
+      id: idSeleccionado, 
+      estado, 
+      comentario,
+      usuario: usuarioActual
+    };
 
     if (navigator.onLine) {
       // Si hay conexión, enviamos al servidor
@@ -286,6 +315,7 @@ if (navigator.geolocation) {
       }).then(res => {
         if (res.ok) {
           bootstrap.Modal.getInstance(document.getElementById('estadoModal')).hide();
+          console.log('Cambio enviado');
           cargarCasas(usuarioActual);
         } else alert('Error al actualizar');
       });
