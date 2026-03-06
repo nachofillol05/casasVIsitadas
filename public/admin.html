@@ -130,16 +130,17 @@ centrarMapa(MISION);
   }
 
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18, attribution: '© OpenStreetMap'
+    maxZoom: 19, attribution: '© OpenStreetMap'
   });
 
   const satelite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-    maxZoom: 18, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: '© Google'
+    maxZoom: 19, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: '© Google'
   });
 
   const mapa = L.map('map', {
     zoom: 15,
-    layers: [osm]
+    layers: [osm],
+    closePopupOnClick: true,
   });
 
   const drawnItems = new L.FeatureGroup();
@@ -298,7 +299,7 @@ centrarMapa(MISION);
         fillOpacity: 0.8,
         weight: casa.asignado_a ? 2 : 1,
         casaId: casa.id,
-        asignado: !!casa.asignado_a
+        asignado: !!casa.asignado_a,
       }).addTo(mapa);
 
       function toLocalDate(fechaStr) {
@@ -315,19 +316,31 @@ centrarMapa(MISION);
 
 
 
-     marker.on('click', () => {
+      marker.on('click', () => {
 
-  // 🟢 Si está visitada → mostrar modal con historial
-  if ((casa.estado != 'otro')&& casa.historial && casa.historial.length > 0) {
+        // 🟢 Si está visitada → mostrar historial
+        if ((casa.estado != 'otro') && casa.historial && casa.historial.length > 0) {
 
-    const cont = document.getElementById('historialContenido');
+          const cont = document.getElementById('historialContenido');
 
-    const historialOrdenado = [...casa.historial]
-      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+          const historialOrdenado = [...casa.historial]
+            .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
-    cont.innerHTML = `
-      <h6><b>${casa.direccion}</b></h6>
-      <hr>
+          cont.innerHTML = `
+     <h6>
+        <span id="dir-text-${casa.id}">${casa.direccion || 'Sin dirección'}</span>
+        <span id="edit-${casa.id}" style="cursor:pointer;margin-left:6px;">✏️</span>
+      </h6>
+
+      <input 
+        id="dir-input-${casa.id}" 
+        class="form-control form-control-sm mt-2"
+        value="${casa.direccion || ''}"
+        style="display:none"
+      />
+      <small class="text-muted" id="dir-help-${casa.id}" style="display:none">
+        Enter para guardar
+      </small>
       ${historialOrdenado.map(h => `
         <div class="mb-3 p-2 border rounded">
           <b>Usuario:</b> ${h.usuario || '—'}<br>
@@ -337,17 +350,178 @@ centrarMapa(MISION);
         </div>
       `).join('')}
     `;
+          setTimeout(() => {
+
+            const edit = document.getElementById(`edit-${casa.id}`);
+      const text = document.getElementById(`dir-text-${casa.id}`);
+      const input = document.getElementById(`dir-input-${casa.id}`);
+      const help = document.getElementById(`dir-help-${casa.id}`);
+
+      text.ondblclick = edit.onclick;
+
+      if (!edit) return;
+
+      edit.onclick = () => {
+
+        text.style.display = "none";
+        edit.style.display = "none";
+
+        input.style.display = "block";
+        help.style.display = "block";
+
+        input.focus();
+        input.select();
+      };
+
+      input.addEventListener('keydown', async (e) => {
+
+        if (e.key === 'Enter') {
+
+          const nuevaDireccion = input.value.trim();
+
+          try {
+
+            const res = await fetch('/actualizar_direccion', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: casa.id,
+                direccion: nuevaDireccion
+              })
+            });
+
+            if (res.ok) {
+
+              casa.direccion = nuevaDireccion;
+
+              text.textContent = nuevaDireccion || "Sin dirección";
+
+              input.style.display = "none";
+              help.style.display = "none";
+
+              text.style.display = "inline";
+              edit.style.display = "inline";
+
+              text.style.color = "green";
+
+              setTimeout(() => text.style.color = "", 800);
+
+            } else {
+              alert("Error guardando dirección");
+            }
+
+          } catch (err) {
+            console.error(err);
+            alert("Error de conexión");
+          }
+
+        }
+
+      });
+
+    }, 100);
 
     const modal = new bootstrap.Modal(document.getElementById('historialModal'));
     modal.show();
 
   } else {
-    // 🔵 Si no está visitada → popup normal
+
+    // 🔵 Popup editable
     marker.bindPopup(`
-      <b>${casa.direccion}</b><br>
-      Estado: ${casa.estado || '(sin estado)'}<br>
-      Asignado a: ${casa.asignado_a || 'nadie'}
-    `).openPopup();
+      <div style="min-width:200px">
+        <label><b>Nombre</b></label>
+        <br>
+                <span id="dir-text-${casa.id}">${casa.direccion || 'Sin dirección'}</span>
+        <span id="edit-${casa.id}" style="cursor:pointer;margin-left:6px;">✏️</span>
+    
+
+      <input 
+        id="dir-input-${casa.id}" 
+        class="form-control form-control-sm mt-2"
+        value="${casa.direccion || ''}"
+        style="display:none"
+      />
+      <small class="text-muted" id="dir-help-${casa.id}" style="display:none">
+        Enter para guardar
+      </small>
+      <hr>
+
+        Estado: ${casa.estado || '(sin estado)'}<br>
+        Asignado a: ${casa.asignado_a || 'nadie'}
+      </div>
+    `, { autoClose: false }).openPopup();
+
+    setTimeout(() => {
+
+      const edit = document.getElementById(`edit-${casa.id}`);
+      const text = document.getElementById(`dir-text-${casa.id}`);
+      const input = document.getElementById(`dir-input-${casa.id}`);
+      const help = document.getElementById(`dir-help-${casa.id}`);
+
+      text.ondblclick = edit.onclick;
+
+      if (!edit) return;
+
+      edit.onclick = () => {
+
+        text.style.display = "none";
+        edit.style.display = "none";
+
+        input.style.display = "block";
+        help.style.display = "block";
+
+        input.focus();
+        input.select();
+      };
+
+      input.addEventListener('keydown', async (e) => {
+
+        if (e.key === 'Enter') {
+
+          const nuevaDireccion = input.value.trim();
+
+          try {
+
+            const res = await fetch('/actualizar_direccion', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: casa.id,
+                direccion: nuevaDireccion
+              })
+            });
+
+            if (res.ok) {
+
+              casa.direccion = nuevaDireccion;
+
+              text.textContent = nuevaDireccion || "Sin dirección";
+
+              input.style.display = "none";
+              help.style.display = "none";
+
+              text.style.display = "inline";
+              edit.style.display = "inline";
+
+              text.style.color = "green";
+
+              setTimeout(() => text.style.color = "", 800);
+
+            } else {
+              alert("Error guardando dirección");
+            }
+
+          } catch (err) {
+            console.error(err);
+            alert("Error de conexión");
+          }
+
+        }
+
+      });
+
+    }, 100);
+
   }
 
 });
@@ -376,7 +550,14 @@ centrarMapa(MISION);
   }
   cargarCasas();
   setInterval(() => {
+
+    // si hay un popup abierto no recargamos
+    if (mapa._popup && mapa._popup.isOpen()) {
+      return;
+    }
+
     cargarCasas();
+
   }, 5000);
 </script>
 </body>

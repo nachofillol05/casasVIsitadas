@@ -127,7 +127,7 @@ async function centrarMapa(nombreMision) {
     mapa.setView([-31.426512, -64.176008], 16);
   }
 }
-centrarMapa(MISION);
+
 
 // ======================================================
 
@@ -140,21 +140,24 @@ centrarMapa(MISION);
     };
 
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 20,
+      maxZoom: 19,
       attribution: '© OpenStreetMap contributors'
     });
 
     const satelite = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-      maxZoom: 20,
+      maxZoom: 19,
       subdomains: ['mt0','mt1','mt2','mt3'],
       attribution: '© Google Satellite'
     });
 
     const mapa = L.map('map', {
       zoom: 16,
-      maxZoom: 20,
+      maxZoom: 19,
       layers: [osm]
     });
+
+
+    centrarMapa(MISION);
 
     let capaSateliteActiva = false;
     let usuarioActual = null;
@@ -379,7 +382,7 @@ async function intentarSincronizarPendientes() {
       if (intervaloActualizacion) clearInterval(intervaloActualizacion);
       intervaloActualizacion = setInterval(() => {
         if (usuarioActual) cargarCasas(usuarioActual);
-      }, 5000); // cada 5 segundos
+      }, 25000); // cada 25 segundos
     }
 
 

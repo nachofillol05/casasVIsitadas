@@ -356,6 +356,28 @@ app.get('/centro', async (req, res) => {
   }
 });
 
+app.post('/actualizar_direccion', async (req, res) => {
+  const { id, direccion } = req.body;
+
+  if (!id) {
+    return res.status(400).send("Faltan datos");
+  }
+
+  try {
+
+    await pool.query(
+      `UPDATE casas SET direccion = $1 WHERE id = $2`,
+      [direccion, id]
+    );
+
+    res.sendStatus(200);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error actualizando direccion");
+  }
+});
+
 
 
 

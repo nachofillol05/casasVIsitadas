@@ -1,13 +1,28 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <title>Estadísticas</title>
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
-    .filtro { margin-bottom: 15px; }
-    table { font-size: 14px; }
+    body {
+      padding: 20px;
+    }
+
+    .filtro {
+      margin-bottom: 15px;
+    }
+
+    table {
+      font-size: 14px;
+    }
+
     .icon-btn {
       background: none;
       border: none;
@@ -15,131 +30,531 @@
       cursor: pointer;
       color: #0d6efd;
     }
+
     .icon-btn:hover {
       color: #084298;
     }
   </style>
+
 </head>
-<body class="container mt-4">
+
+
+<body class="container-fluid">
+
   <h2 class="mb-3">Estadísticas Generales</h2>
 
   <div class="mb-4">
+
     <button onclick="history.back()" class="btn btn-secondary">
       Volver
     </button>
 
-    <button onclick="exportar()" class="btn btn-success ms-2">Exportar a Excel</button>
+    <button onclick="exportar()" class="btn btn-success ms-2">
+      Exportar a Excel
+    </button>
+
   </div>
 
-  <div class="mb-4">
-    <h5>Resumen:</h5>
-    <ul id="resumen"></ul>
+
+  <div class="row mb-4" id="cardsResumen"></div>
+
+
+  <div class="row mb-4">
+
+    <div class="col-lg-6 mb-4">
+
+      <div class="card shadow-sm h-100">
+
+        <div class="card-body">
+
+          <h6 class="card-title">Progreso por usuario</h6>
+
+          <canvas id="graficoUsuarios"></canvas>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="col-lg-6 mb-4">
+
+      <div class="card shadow-sm h-100">
+
+        <div class="card-body">
+
+          <h6 class="card-title">Estados de casas</h6>
+
+          <canvas id="graficoEstados"></canvas>
+
+        </div>
+
+      </div>
+
+    </div>
+
   </div>
 
+
+
   <div class="mb-4">
+
     <input type="text" id="filtroTexto" class="form-control filtro" placeholder="Filtrar por texto...">
+
     <table class="table table-bordered table-sm" id="tablaExportable">
+
       <thead class="table-light">
+
         <tr>
           <th>📍</th>
           <th>Dirección</th>
           <th>Estado</th>
           <th>Comentario</th>
+          <th>Historial</th>
           <th>Asignado a</th>
           <th>Coordenadas</th>
         </tr>
+
       </thead>
+
       <tbody id="tablaComentarios"></tbody>
+
     </table>
+
   </div>
+
+
+
+  <!-- MODAL HISTORIAL -->
+
+  <div class="modal fade" id="modalHistorial" tabindex="-1">
+
+    <div class="modal-dialog modal-lg">
+
+      <div class="modal-content">
+
+        <div class="modal-header">
+
+          <h5 class="modal-title">Historial de visitas</h5>
+
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+
+        </div>
+
+        <div class="modal-body">
+
+          <div id="contenidoHistorial"></div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 
   <script>
 
-    // ================== MISION DESDE URL ==================
-const params = new URLSearchParams(window.location.search);
-const MISION = params.get("mision");
 
-if (!MISION) {
-  alert("⚠️ Falta el parámetro ?mision= en la URL");
-  throw new Error("Misión no especificada");
-}
+    // ================== MISION ==================
 
-console.log("Misión activa:", MISION);
-// ======================================================
+    const params = new URLSearchParams(window.location.search);
 
-    async function cargarDatos() {
-      const res = await fetch(`/casas?mision=${encodeURIComponent(MISION)}`);
-      const casas = await res.json();
+    const MISION = params.get("mision");
 
-      const resumen = {};
-      let totalVisitadas = 0;
+    if (!MISION) {
 
-      casas.forEach(casa => {
-        if (casa.estado === 'visitada') totalVisitadas++;
-        if (casa.asignado_a) {
-          if (!resumen[casa.asignado_a]) resumen[casa.asignado_a] = { visitadas: 0, asignadas: 0 };
-          resumen[casa.asignado_a].asignadas++;
-          if (casa.estado === 'visitada') resumen[casa.asignado_a].visitadas++;
-        }
-      });
+      alert("⚠️ Falta ?mision=");
 
-      const resumenUl = document.getElementById('resumen');
-      resumenUl.innerHTML = `<li><strong>Total casas visitadas:</strong> ${totalVisitadas}</li>`;
-      for (const persona in resumen) {
-        resumenUl.innerHTML += `<li><strong>${persona}:</strong> ${resumen[persona].visitadas} visitadas / ${resumen[persona].asignadas} asignadas</li>`;
+      throw new Error("Misión no especificada");
+
+    }
+
+
+
+    // ================== CONFIG ==================
+
+    const ESTADOS_VISITA = ["visitada", "peregrina", "volver"];
+
+
+
+    function casaVisitada(casa) {
+
+      if (!casa) return false;
+
+
+      // estado actual
+
+      if (ESTADOS_VISITA.includes((casa.estado || "").toLowerCase()))
+
+        return true;
+
+
+      // historial
+
+      if (casa.historial) {
+
+        return casa.historial.some(h =>
+          ESTADOS_VISITA.includes((h.estado || "").toLowerCase())
+        );
+
       }
 
-      const tbody = document.getElementById('tablaComentarios');
-      tbody.innerHTML = '';
+      return false;
+
+    }
+
+
+
+    function usuarioVisitoCasa(casa, usuario) {
+
+      if (!casa.historial) return false;
+
+      return casa.historial.some(h =>
+
+        h.usuario === usuario &&
+        ESTADOS_VISITA.includes((h.estado || "").toLowerCase())
+
+      );
+
+    }
+
+
+
+    async function cargarDatos() {
+
+      const res = await fetch(`/casas?mision=${encodeURIComponent(MISION)}`);
+
+      const casas = await res.json();
+
+      window.casas = casas;
+
+
+
+      let totalVisitadas = 0;
+
+      const resumen = {};
+
+
 
       casas.forEach(casa => {
-        const fila = document.createElement('tr');
-        const lat = casa.latitud;
-        const lon = casa.longitud;
-        const coords = `${lat}, ${lon}`;
-        fila.innerHTML = `
-          <td>
-            <button class="icon-btn" onclick="verEnMapa(${lat}, ${lon})" title="Ver en mapa">
-              📍
-            </button>
-          </td>
-          <td>${casa.direccion || ''}</td>
-          <td>${casa.estado || ''}</td>
-          <td>${casa.comentario || ''}</td>
-          <td>${casa.asignado_a || ''}</td>
-          <td>
-            <button class="btn btn-sm btn-outline-secondary" onclick="copiarCoords('${coords}')">${coords}</button>
-          </td>
-        `;
-        tbody.appendChild(fila);
+
+
+        // total general
+
+        if (casaVisitada(casa))
+
+          totalVisitadas++;
+
+
+
+        // resumen por usuario
+
+        if (casa.asignado_a) {
+
+          const u = casa.asignado_a;
+
+          if (!resumen[u])
+
+            resumen[u] = { visitadas: 0, asignadas: 0 };
+
+          resumen[u].asignadas++;
+
+
+          if (usuarioVisitoCasa(casa, u))
+
+            resumen[u].visitadas++;
+
+        }
+
       });
 
-      document.getElementById('filtroTexto').addEventListener('input', e => {
-        const texto = e.target.value.toLowerCase();
-        document.querySelectorAll('#tablaComentarios tr').forEach(row => {
-          const match = [...row.children].some(td => td.textContent.toLowerCase().includes(texto));
-          row.style.display = match ? '' : 'none';
+
+
+      // ================== CARDS ==================
+
+      const cards = document.getElementById("cardsResumen");
+
+      cards.innerHTML = `
+
+<div class="col-lg-3 col-md-6 mb-3">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<h6>Total Casas</h6>
+<h3>${casas.length}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-lg-3 col-md-6 mb-3">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<h6>Visitadas</h6>
+<h3>${totalVisitadas}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-lg-3 col-md-6 mb-3">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<h6>Pendientes</h6>
+<h3>${casas.length - totalVisitadas}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-lg-3 col-md-6 mb-3">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<h6>Usuarios activos</h6>
+<h3>${Object.keys(resumen).length}</h3>
+</div>
+</div>
+</div>
+
+`;
+
+
+
+      // ================== GRAFICO USUARIOS ==================
+
+      const usuarios = Object.keys(resumen);
+
+      const visitadas = usuarios.map(u => resumen[u].visitadas);
+
+      const asignadas = usuarios.map(u => resumen[u].asignadas);
+
+
+
+      new Chart(
+
+        document.getElementById("graficoUsuarios"),
+
+        {
+          type: "bar",
+
+          data: {
+            labels: usuarios,
+            datasets: [
+              { label: "Visitadas", data: visitadas },
+              { label: "Asignadas", data: asignadas }
+            ]
+          },
+
+          options: {
+            responsive: true,
+            plugins: { legend: { position: "bottom" } }
+          }
+
         });
+
+
+
+      // ================== GRAFICO ESTADOS ==================
+
+      const estados = {};
+
+      casas.forEach(c => {
+
+        const e = c.estado || "sin_estado";
+
+        estados[e] = (estados[e] || 0) + 1;
+
       });
+
+
+      new Chart(
+
+        document.getElementById("graficoEstados"),
+
+        {
+          type: "doughnut",
+
+          data: {
+            labels: Object.keys(estados),
+            datasets: [{ data: Object.values(estados) }]
+          },
+
+          options: {
+            responsive: true,
+            plugins: { legend: { position: "bottom" } }
+          }
+
+        });
+
+
+
+      // ================== TABLA ==================
+
+      const tbody = document.getElementById("tablaComentarios");
+
+      tbody.innerHTML = "";
+
+      casas.forEach(casa => {
+
+        const fila = document.createElement("tr");
+
+        const lat = casa.latitud;
+
+        const lon = casa.longitud;
+
+        const coords = `${lat}, ${lon}`;
+
+
+
+        fila.innerHTML = `
+
+<td>
+<button class="icon-btn" onclick="verEnMapa(${lat},${lon})">📍</button>
+</td>
+
+<td>${casa.direccion || ""}</td>
+
+<td>${casa.estado || ""}</td>
+
+<td>${casa.comentario || ""}</td>
+
+<td>
+<button class="btn btn-sm btn-outline-primary"
+onclick='abrirHistorial(${JSON.stringify(casa.historial || [])})'>
+Ver historial
+</button>
+</td>
+
+<td>${casa.asignado_a || ""}</td>
+
+<td>
+<button class="btn btn-sm btn-outline-secondary"
+onclick="copiarCoords('${coords}')">
+${coords}
+</button>
+</td>
+
+`;
+
+        tbody.appendChild(fila);
+
+      });
+
     }
+
+
+
+    // ================== FILTRO ==================
+
+    document.getElementById("filtroTexto").addEventListener("input", e => {
+
+      const texto = e.target.value.toLowerCase();
+
+      document.querySelectorAll("#tablaComentarios tr").forEach((row, i) => {
+
+        const casa = window.casas[i];
+
+        const textoFila = row.textContent.toLowerCase();
+
+        const textoHist = (casa.historial || [])
+          .map(h => `${h.estado} ${h.comentario}`)
+          .join(" ")
+          .toLowerCase();
+
+        row.style.display =
+          textoFila.includes(texto) || textoHist.includes(texto)
+            ? ""
+            : "none";
+
+      });
+
+    });
+
+
+
+    // ================== UTILS ==================
 
     function exportar() {
-      const tabla = document.getElementById('tablaExportable');
+
+      const tabla = document.getElementById("tablaExportable");
+
       const wb = XLSX.utils.table_to_book(tabla, { sheet: "Estadísticas" });
-      XLSX.writeFile(wb, 'estadisticas.xlsx');
+
+      XLSX.writeFile(wb, "estadisticas.xlsx");
+
     }
+
+
 
     function verEnMapa(lat, lon) {
-      window.open(`mapa_casa.html?lat=${lat}&lon=${lon}`, '_blank');
+
+      window.open(`mapa_casa.html?lat=${lat}&lon=${lon}`);
+
     }
+
+
 
     function copiarCoords(coords) {
-      navigator.clipboard.writeText(coords).then(() => {
-        alert("Coordenadas copiadas: " + coords);
-      });
+
+      navigator.clipboard.writeText(coords);
+
+      alert("Coordenadas copiadas");
+
     }
 
+
+
+    function abrirHistorial(historial) {
+
+      const cont = document.getElementById("contenidoHistorial");
+
+      cont.innerHTML = "";
+
+
+      if (!historial || historial.length === 0) {
+
+        cont.innerHTML = "<p>No hay visitas registradas</p>";
+
+      } else {
+
+        historial.forEach(v => {
+
+          cont.innerHTML += `
+
+<div class="border rounded p-2 mb-2">
+
+<strong>Usuario:</strong> ${v.usuario || ""}<br>
+
+<strong>Estado:</strong> ${v.estado || ""}<br>
+
+<strong>Comentario:</strong> ${v.comentario || ""}<br>
+
+<strong>Fecha:</strong> ${v.fecha ? new Date(v.fecha).toLocaleString() : ""}
+
+</div>
+
+`;
+
+        });
+
+      }
+
+
+      new bootstrap.Modal(
+        document.getElementById("modalHistorial")
+      ).show();
+
+    }
+
+
+
     cargarDatos();
+
   </script>
+
 </body>
+
 </html>
