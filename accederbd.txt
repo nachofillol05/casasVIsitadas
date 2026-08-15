@@ -1,6 +1,0 @@
-psql postgresql://nacho:52EyTa6zVJSVcwQfAXx3m7RRqEnH0h5O@dpg-d14a9cp5pdvs73bbr2k0-a.oregon-postgres.render.com/casasvisitadas
-
-backup: pg_dump postgresql://usuario:password@host:puerto/dbname -Fc -f backup.dump
-crear postgresql://nuevo_usuario:nueva_pass@nuevo_host:nuevo_puerto/nuevo_dbname
-restaurar: pg_restore -d postgresql://nuevo_usuario:nueva_pass@nuevo_host:nuevo_puerto/nuevo_dbname backup.dump
-
